@@ -1,0 +1,36 @@
+# First physical-economy pilot. Chokepoint names are resolved against the live
+# PortWatch metadata catalog instead of hard-coding numeric IDs.
+source: IMF PortWatch
+service: Daily_Chokepoints_Data
+observation_start: 2019-01-01
+# Completed chokepoint-year downloads are cached so interrupted runs can resume.
+cache_dir: data/cache/portwatch
+# Historical publication vintages are not reconstructed by the live endpoint.
+# Ten calendar days is a pre-specified pilot assumption, NOT an asserted true release lag.
+# Positive findings must survive 7/14/21-day sensitivity runs.
+availability_lag_days: 10
+availability_lag_sensitivity_days: [7, 14, 21]
+chokepoints:
+  - Suez Canal
+  - Panama Canal
+  - Strait of Hormuz
+  - Bab el-Mandeb Strait
+  - Cape of Good Hope
+  - Malacca Strait
+# Baseline physical layer = 6 chokepoints x 2 metrics = 12 nodes.
+metrics:
+  - capacity
+  - n_total
+# Held out of the baseline; candidates for pre-specified later ablations.
+candidate_metrics:
+  - n_tanker
+  - n_dry_bulk
+  - n_container
+features:
+  # Strong annual/weekday seasonality is removed before the network sees the data.
+  # 364 days = 52 weeks, preserving weekday alignment.
+  method: seasonal_yoy
+  smooth_days: 7
+  seasonal_lag_days: 364
+  baseline_days: 365
+  min_periods: 90

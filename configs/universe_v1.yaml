@@ -1,0 +1,78 @@
+# Candidate financial layer for empirical release v1.
+# All nodes are daily public FRED series. Transform direction is chosen so FX columns
+# read as the local currency's value versus USD where practical.
+financial:
+  - id: audusd
+    source: FRED
+    series_id: DEXUSAL
+    family: fx
+    transform: log_return
+    role: target_and_predictor
+  - id: brlusd
+    source: FRED
+    series_id: DEXBZUS
+    family: fx
+    transform: negative_log_return
+    role: target_and_predictor
+  - id: cnyusd
+    source: FRED
+    series_id: DEXCHUS
+    family: fx
+    transform: negative_log_return
+    role: target_and_predictor
+  - id: krwusd
+    source: FRED
+    series_id: DEXKOUS
+    family: fx
+    transform: negative_log_return
+    role: target_and_predictor
+  - id: eurusd
+    source: FRED
+    series_id: DEXUSEU
+    family: fx
+    transform: log_return
+    role: target_and_predictor
+  - id: sp500
+    source: FRED
+    series_id: SP500
+    family: equity
+    transform: log_return
+    role: target_and_predictor
+  - id: vix
+    source: FRED
+    series_id: VIXCLS
+    family: volatility
+    transform: difference
+    role: target_and_predictor
+  - id: us2y
+    source: FRED
+    series_id: DGS2
+    family: rates
+    transform: difference
+    role: target_and_predictor
+  - id: us10y
+    source: FRED
+    series_id: DGS10
+    family: rates
+    transform: difference
+    role: target_and_predictor
+  - id: wti
+    source: FRED
+    series_id: DCOILWTICO
+    family: commodity_energy
+    # WTI spot traded below zero in April 2020, so log returns are undefined.
+    # Use dollar first differences; SparseVAR standardises features inside each training window.
+    transform: difference
+    role: target_and_predictor
+  - id: brent
+    source: FRED
+    series_id: DCOILBRENTEU
+    family: commodity_energy
+    transform: log_return
+    role: target_and_predictor
+  - id: henry_hub
+    source: FRED
+    series_id: DHHNGSP
+    family: commodity_energy
+    transform: log_return
+    role: target_and_predictor

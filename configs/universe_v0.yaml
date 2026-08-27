@@ -1,0 +1,43 @@
+# Candidate public-data universe for the first empirical release.
+# This is intentionally compact. Every node must survive a provenance/licence review
+# before it is enabled in the final dataset.
+financial:
+  - id: audusd
+    source: FRED
+    series_id: DEXUSAL
+    family: fx
+    transform: log_return
+  - id: brlusd_inverse
+    source: FRED
+    series_id: DEXBZUS
+    family: fx
+    transform: negative_log_return
+  - id: sp500
+    source: FRED
+    series_id: SP500
+    family: equity
+    transform: log_return
+  - id: vix
+    source: FRED
+    series_id: VIXCLS
+    family: volatility
+    transform: difference
+  - id: us10y
+    source: FRED
+    series_id: DGS10
+    family: rates
+    transform: difference
+  - id: wti
+    source: FRED
+    series_id: DCOILWTICO
+    family: commodity
+    transform: log_return
+physical_candidates:
+  - id: maritime_trade
+    source: IMF PortWatch public export
+    family: physical_trade
+    transform: seasonal_anomaly
+  - id: energy_flow
+    source: EIA public data
+    family: physical_energy
+    transform: change_or_anomaly

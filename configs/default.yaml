@@ -1,0 +1,10 @@
+model:
+  lags: 3
+  alpha: 0.035
+  edge_threshold: 0.05
+walk_forward:
+  min_train: 500
+  refit_every: 20
+synthetic:
+  n_obs: 1800
+  seed: 7
