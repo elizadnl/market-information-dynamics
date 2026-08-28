@@ -1,8 +1,9 @@
 Metadata-Version: 2.4
 Name: market-information-dynamics
-Version: 0.7.0
-Summary: Dynamic information-flow research across financial markets and the physical economy.
+Version: 1.0.0
+Summary: Online model trust, signal survival and alternative-data forecasting under non-stationarity.
 License: MIT
+Project-URL: Repository, https://github.com/elizadnl/market-information-dynamics
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
 License-File: LICENSE
@@ -23,62 +24,100 @@ Dynamic: license-file
 
 # Market Information Dynamics
 
-### Learning when to trust — and stop trusting — predictive models in non-stationary markets
+### Online model trust under non-stationary financial data
 
-**Research question:** when a new data domain appears predictive, how can we tell whether it adds
-real forecasting information beyond an existing model, and how should that trust change when the
-relationship decays?
+[![tests](https://github.com/elizadnl/market-information-dynamics/actions/workflows/tests.yml/badge.svg)](https://github.com/elizadnl/market-information-dynamics/actions/workflows/tests.yml)
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
+![C++](https://img.shields.io/badge/C%2B%2B-17-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-This is an independent public-data quantitative-research project. Financial-market history forms a
-**protected core model**. Public physical-economy data are used as a deliberately difficult candidate
-information layer. The statistical machinery is general: the candidate domain could instead be
-satellite, web, sentiment, microstructure or other alternative data.
+**Research question:** when a new information source appears predictive, how can a forecasting system tell whether it adds genuine out-of-sample information — and when should it stop trusting it?
 
-> **Current status — v0.7:** the repository now contains four empirical stages, including negative
-> results. The current method treats model choice itself as a sequential decision problem and uses
-> causal **Fixed-Share online expert aggregation**. The methodology is frozen for prospective
-> September-2026+ monitoring; 2025-2026 results are explicitly labelled reused diagnostics.
+This is an independent quantitative-research project on **non-stationary prediction, signal decay and online model selection**. A financial-market model is treated as a protected core; public physical-economy data provide a deliberately difficult candidate information layer. The statistical framework is domain-agnostic and can be reused with satellite, sentiment, web, microstructure or other alternative data.
 
-![Fixed-Share regime-switch demo](artifacts/synthetic_fixed_share_regime_switch.png)
+> **Status:** methodology frozen for prospective monitoring from **1 September 2026**. Historical 2025–2026 results are retained as reused diagnostics, not relabelled as a fresh holdout.
 
-## What the research actually found
+![Fixed-Share regime-switch demonstration](artifacts/synthetic_fixed_share_regime_switch.png)
 
-The project does **not** claim that shipping data generate alpha.
+## 30-second overview
 
-| Stage | Question | Real-data conclusion |
+- **12 financial targets** across FX, equities, volatility, rates and energy.
+- **1 / 5 / 10 / 20 trading-day horizons** with direct forecasts.
+- Public **FRED** market data and **IMF PortWatch** alternative data.
+- Expanding walk-forward evaluation with explicit point-in-time availability rules.
+- Sparse forecasting, edge-level OOS loss attribution and post-selection refitting.
+- A protected financial core plus candidate-data residual overlays.
+- **Fixed-Share online expert aggregation** to adapt model trust after regime changes.
+- HAC forecast-comparison tests and Benjamini–Hochberg FDR control.
+- A small **C++17** acceleration layer for a profiled deterministic bottleneck, with parity tests and CI.
+- Negative results are frozen in the repository rather than removed after the fact.
+
+For the compact research write-up, see **[`docs/RESEARCH_NOTE.md`](docs/RESEARCH_NOTE.md)**.
+
+## Why this problem
+
+A common quantitative-research failure mode is to confuse a relationship that is repeatedly selected with one that remains useful. In a non-stationary system, the harder question is not only:
+
+> *What predicts the target?*
+
+but also:
+
+> *How much evidence should a model need before it is trusted, how quickly should old evidence decay, and how should the system recover when the best model changes?*
+
+The project evolved around that distinction after its first alternative-data hypothesis failed out of sample.
+
+## Research architecture
+
+```mermaid
+flowchart LR
+    A[Public market data] --> C[Financial core]
+    B[Candidate alternative data] --> D[Candidate overlay]
+    C --> E[Realised OOS core residuals]
+    E --> D
+    D --> F[Edge-level OOS attribution]
+    F --> G[Signal survival / refit]
+    C --> H[Forecast expert 1]
+    G --> I[Forecast expert 2]
+    H --> J[Fixed-Share online aggregation]
+    I --> J
+    J --> K[Final forecast]
+    K --> L[HAC tests + FDR + diagnostics]
+```
+
+For each horizon `h ∈ {1, 5, 10, 20}`:
+
+1. fit a financial-only direct sparse forecasting model;
+2. generate genuine walk-forward core forecasts;
+3. wait until the complete `h`-step outcome is realised;
+4. fit candidate information only to historical **OOS core residuals**;
+5. attribute candidate-edge value using realised marginal forecast-loss reduction;
+6. refit surviving candidate edges after sparse discovery;
+7. treat the core and candidate-overlay forecasts as competing experts;
+8. combine them using causal Fixed-Share exponential weighting.
+
+An `h`-step forecast cannot alter edge scores or expert weights until that `h`-step outcome is fully observable.
+
+## Empirical research path
+
+The repository keeps each stage, including the null results that motivated the next method.
+
+| Stage | Question | Reused real-data result |
 |---|---|---|
-| v1 | Does baseline PortWatch data improve 1-day financial forecasts? | **No robust incremental value.** Mean skill vs financial-only was about -0.10%; 0 FDR-significant improvements. |
-| v2 | Can structurally persistent edges be trusted? | Filtering reduced some full-model damage, but usually still lost to the financial core. |
-| v3 | Can candidate data explain genuine OOS errors left by a protected core? | Adaptive gating strongly reduced damage, but beat the core in only 12/48 target-horizon comparisons; 0 FDR rejections. |
-| v4 | Can online learning choose between the core and candidate expert through time? | Fixed-Share beat the raw survival-overlay expert in 42/48 comparisons. It roughly matched the core overall and was +0.11% mean RMSE skill vs core at 20d, but again **no FDR-significant improvement**. |
+| **v1** | Does baseline PortWatch information improve one-day forecasts beyond financial history? | **No robust incremental value.** Mean skill vs financial-only ≈ **-0.10%**; no FDR-significant improvements. |
+| **v2** | Is structural persistence enough to decide which edges survive? | No. Persistence filtering reduced some damage but usually still lost to the financial core. |
+| **v3** | Can candidate data explain genuine OOS errors left by a protected core? | Adaptive gating reduced candidate-model damage, but beat the core in only **12/48** target–horizon comparisons; no FDR rejections. |
+| **v4** | Can online learning adapt trust between the core and candidate model? | Fixed-Share beat the raw survival-overlay expert in **42/48** comparisons; relative to the core, the primary rule was approximately flat overall and **+0.11% mean RMSE skill at 20d**, with no FDR-significant improvement. |
 
-The negative results are the point: each failed hypothesis narrows the statistical question rather
-than being hidden or overwritten.
+The project therefore makes **no alpha claim**. The empirical contribution is the disciplined study of model trust under non-stationarity and a transparent record of which hypotheses failed.
 
-See:
+Detailed frozen findings:
 
 - [`docs/empirical_v1_findings.md`](docs/empirical_v1_findings.md)
 - [`docs/empirical_v2_findings.md`](docs/empirical_v2_findings.md)
 - [`docs/empirical_v3_findings.md`](docs/empirical_v3_findings.md)
 - [`docs/empirical_v4_findings.md`](docs/empirical_v4_findings.md)
 
-## Current model architecture
-
-For horizon `h ∈ {1, 5, 10, 20}`:
-
-1. fit a financial-only direct sparse forecasting model;
-2. generate genuine walk-forward core forecasts;
-3. wait until the complete h-step outcome realises;
-4. fit candidate data only to historical **OOS core residuals**;
-5. score candidate edges by realised incremental loss reduction versus the protected core;
-6. post-selection refit surviving candidate edges;
-7. treat the financial core and candidate-overlay model as forecast **experts**;
-8. combine them with causal Fixed-Share exponential weighting.
-
-The final layer is therefore not a hard-coded claim that candidate data matter. It learns model
-trust sequentially from realised forecast losses.
-
-### Fixed-Share update
+## Fixed-Share model trust
 
 For expert weights `w_k,t` and bounded realised loss `ℓ_k,t`:
 
@@ -88,120 +127,82 @@ w~_k,t+1 ∝ w_k,t exp(-η_t ℓ_k,t)
 w_k,t+1 = (1 - α) w~_k,t+1 + α / K
 ```
 
-The small share term `α` lets a previously weak expert recover after a regime change. Crucially,
-an h-step forecast cannot update weights until that h-step target is fully observable.
+The share term prevents a model from being permanently eliminated: if the regime changes, a previously weak expert can recover. The primary share parameter is pre-specified as `1/252` per realised update; nearby values are reported as sensitivity diagnostics rather than chosen after observing performance.
 
-The primary share is pre-specified as `1/252` per realised update; nearby values are reported as
-sensitivity diagnostics rather than selected after seeing performance.
+### Controlled falsification tests
 
-## Why this is a quant-research project rather than a freight project
+The synthetic tests are not performance showcases; they provide known ground truth.
 
-Shipping is only the **candidate information source**. The actual research problems are:
+**Edge death.** A relationship remains repeatedly selected by LASSO after its true predictive value is removed. The survival layer must distinguish coefficient persistence from realised forecast utility.
 
-- non-stationary prediction;
-- sparse high-dimensional forecasting;
-- point-in-time data alignment;
-- online model selection;
-- signal decay and model death;
-- sequential loss attribution;
-- overlapping-horizon inference;
-- multiple testing;
-- leakage-safe walk-forward evaluation;
-- deciding when complexity should be switched off.
+![Signal survival demonstration](artifacts/synthetic_signal_survival.png)
 
-The same framework can accept other candidate data domains without changing the statistical
-question.
+**Model death.** A candidate expert is genuinely useful early and deliberately made worse after a regime switch. Fixed-Share should increase its weight while useful and move back toward the core after the signal disappears.
+
+![Fixed-Share regime-switch demonstration](artifacts/synthetic_fixed_share_regime_switch.png)
 
 ## Statistical design
 
 The project includes:
 
-- direct 1/5/10/20-day forecasts;
+- direct multi-horizon forecasting rather than recursive rollouts;
 - expanding walk-forward estimation;
+- target-only AR baselines;
 - LASSO sparse structure discovery;
 - OOS-residual candidate-model training;
-- recency-weighted edge persistence/sign/strength diagnostics;
-- candidate-edge marginal OOS loss attribution;
+- recency-weighted edge persistence, sign and strength diagnostics;
+- edge-level marginal OOS loss attribution;
 - post-selection Ridge refitting;
 - protected-core candidate augmentation;
-- causal Fixed-Share online expert aggregation;
+- causal online expert aggregation;
 - horizon-delayed learning updates;
-- HAC Diebold-Mariano-style forecast comparisons;
-- Benjamini-Hochberg FDR control;
-- explicit point-in-time alternative-data availability rules;
+- horizon-aware HAC forecast-loss inference;
+- Benjamini–Hochberg FDR control;
+- explicit point-in-time alternative-data timing;
 - controlled regime-switch falsification tests;
-- a prospective protocol frozen before September-2026 observations.
+- a prospectively frozen evaluation protocol.
 
-Directed edges represent lagged predictive association under the fitted model, **not structural
-causality**.
+Directed edges indicate **lagged predictive association under the fitted forecasting system**, not structural causality.
 
-## Controlled falsification tests
-
-The repository contains synthetic environments where the ground truth is known.
-
-### Edge death
-
-A relationship remains repeatedly selected by LASSO even after its true predictive value is
-removed. The edge-survival layer must learn that selection persistence is not the same thing as
-forecast value.
-
-![Signal survival demo](artifacts/synthetic_signal_survival.png)
-
-### Model death
-
-A candidate expert is genuinely better early in the sample and deliberately made worse after a
-regime switch. Fixed-Share must move probability toward the candidate and later move it back toward
-the core.
-
-![Fixed-Share regime-switch demo](artifacts/synthetic_fixed_share_regime_switch.png)
-
-## Real-data v4 diagnostic
-
-On reused 2025+ history, mean RMSE skill relative to the financial core under the primary
-Fixed-Share rule was approximately:
-
-| Horizon | Mean skill vs financial core | Targets improved |
-|---:|---:|---:|
-| 1d | -0.03% | 2/12 |
-| 5d | -0.15% | 4/12 |
-| 10d | -0.09% | 5/12 |
-| 20d | **+0.11%** | 6/12 |
-
-No target/horizon improvement survives FDR. This is **diagnostic evidence, not a trading claim**.
-The stronger result is that the online combiner beats the much weaker raw candidate-overlay expert
-in 42/48 comparisons and learns to fall back toward the core when candidate information decays.
-
-See [`artifacts/empirical_v4_public/RESULTS.md`](artifacts/empirical_v4_public/RESULTS.md).
-
-## Public data
+## Data and point-in-time discipline
 
 No employer or proprietary data are included.
 
 - **FRED:** daily FX, equities, volatility, rates and energy series.
-- **IMF PortWatch:** public chokepoint activity, cached in small resumable year/chokepoint chunks.
-- **Timing:** physical features receive an explicit assumed availability lag; the current historical
-  API is not misrepresented as a perfect vintage archive.
-- **Transforms:** past-only smoothing and 52-week seasonal anomalies for physical activity.
+- **IMF PortWatch:** public chokepoint activity, downloaded in resumable year/chokepoint chunks.
+- **Alternative-data timing:** physical features receive an explicit assumed availability lag; the historical API is not treated as a perfect vintage archive.
+- **Physical transforms:** past-only smoothing and 52-week seasonal anomalies.
+- **WTI:** first differences are used because the April-2020 negative-price episode makes log returns undefined.
 
 See [`docs/data_provenance.md`](docs/data_provenance.md).
 
-## Prospective evaluation
+## Leakage rules
 
-The historical research path has already inspected 2025-2026, so that period is not relabelled as a
-fresh holdout. The current statistical rule is frozen before prospective observations beginning
-**1 September 2026**.
+1. No random train/test split for time-series claims.
+2. No scaler, feature selection or survival statistic may use future observations.
+3. Candidate observations cannot enter before their assumed availability date.
+4. `h`-step targets cannot alter models, edge scores or expert weights until fully realised.
+5. Candidate models are trained on historical **OOS core residuals**, not in-sample residuals.
+6. Candidate-edge utility is measured relative to the protected financial core.
+7. Online expert weights use only already-realised forecast losses.
+8. Overlapping `h`-step forecast-loss tests use horizon-aware HAC inference.
+9. Multiple target/horizon tests are corrected within pre-specified comparison families.
+10. Reused evaluation periods are labelled honestly; predictability is not causality.
 
-See [`docs/prospective_protocol.md`](docs/prospective_protocol.md). A SHA-256 manifest of the frozen configs and key model files is stored in [`docs/prospective_manifest.json`](docs/prospective_manifest.json).
+## C++ acceleration
 
-## Why there is C++
+The research stack is Python-first. C++17 is used only for a measured deterministic hot path: lagged design-matrix construction.
 
-The research stack is Python-first. C++17 is used only for a measured deterministic hot path:
-lagged-design-matrix construction. The native implementation has Python parity tests, CI coverage,
-a benchmark and automatic Python fallback.
+The native implementation has:
+
+- Python/C++ parity tests;
+- GitHub Actions coverage;
+- a benchmark script;
+- automatic Python fallback.
 
 See [`docs/cpp_acceleration.md`](docs/cpp_acceleration.md).
 
-## Quick start
+## Reproduce
 
 ### Windows
 
@@ -209,7 +210,7 @@ See [`docs/cpp_acceleration.md`](docs/cpp_acceleration.md).
 python -m pip install -e ".[dev]"
 python -m pytest -q
 
-# v4 consumes the already-generated v3 forecast paths; no data redownload is required.
+# Online aggregation uses the already-generated v3 forecast paths.
 powershell -ExecutionPolicy Bypass -File scripts\run_online_aggregation.ps1
 ```
 
@@ -218,7 +219,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run_online_aggregation.ps1
 ```bash
 python -m venv .venv
 # activate environment
-pip install -e .[dev]
+pip install -e '.[dev]'
 pytest
 
 python -m market_information_dynamics.cli empirical-v4 \
@@ -235,73 +236,45 @@ python -m market_information_dynamics.cli overlay-demo
 python -m market_information_dynamics.cli online-demo
 ```
 
-## Leakage rules
-
-1. No random train/test split for time-series claims.
-2. No scaler, feature selection or survival statistic may use future observations.
-3. Candidate observations cannot enter before their assumed availability date.
-4. h-step targets cannot alter a model, edge score or expert weight until fully realised.
-5. Candidate models are trained on historical **OOS core residuals**, not in-sample residuals.
-6. Candidate-edge utility is measured against the protected financial core.
-7. Online expert weights use only already-realised forecast losses.
-8. Overlapping h-step forecast-loss tests use horizon-aware HAC inference.
-9. Multiple target/horizon tests are corrected within pre-specified comparison families.
-10. Reused evaluation periods are labelled honestly; prediction is not causation.
-
-## Repository layout
+## Repository map
 
 ```text
-configs/
-├── empirical_v1.yaml
-├── empirical_v2.yaml
-├── empirical_v3.yaml
-└── empirical_v4.yaml
-cpp/
-└── lagged_design.cpp
-scripts/
-├── run_public_research.ps1
-├── run_signal_survival.ps1
-├── run_candidate_overlay.ps1
-└── run_online_aggregation.ps1
+configs/                     Pre-specified empirical configurations
+cpp/                         Optional C++17 acceleration kernel
+docs/                        Research specification, evidence notes, protocol
+scripts/                     Reproducible Windows / research runners
 src/market_information_dynamics/
-├── data/
-├── compute/
-├── models/
-├── online/
-│   └── fixed_share.py
-├── evaluation/
-│   ├── empirical.py
-│   ├── empirical_v2.py
-│   ├── empirical_v3.py
-│   └── empirical_v4.py
-├── statistics/
-└── visualization/
+├── data/                    Public-data ingestion and timing
+├── compute/                 Lagged feature construction
+├── models/                  Sparse and direct forecasting models
+├── online/                  Fixed-Share expert aggregation
+├── evaluation/              Walk-forward empirical engines
+├── statistics/              FDR, HAC tests, survival diagnostics
+└── visualization/           Network, lifecycle and model-trust plots
 artifacts/
-├── empirical_v1_public/
-├── empirical_v2_public/
-├── empirical_v3_public/
-├── empirical_v4_public/
-└── synthetic_*
+├── empirical_v1_public/     Frozen v1 evidence
+├── empirical_v2_public/     Frozen v2 evidence
+├── empirical_v3_public/     Frozen v3 evidence
+├── empirical_v4_public/     Frozen v4 evidence
+└── synthetic_*              Controlled falsification tests
+tests/                       Python + native-backend regression tests
 ```
+
+## Prospective protocol
+
+Because 2025–2026 has already been inspected during method development, it is **not** relabelled as a fresh confirmatory holdout. The current statistical rule is frozen for observations from **1 September 2026 onward**.
+
+The frozen configuration and key model files are recorded in [`docs/prospective_manifest.json`](docs/prospective_manifest.json) using SHA-256 hashes. See [`docs/prospective_protocol.md`](docs/prospective_protocol.md).
 
 ## Research principles
 
-**A candidate data source must earn incremental value.** The baseline is protected.
+- **A candidate data source must earn incremental value.** The baseline is protected.
+- **Negative results remain visible.** They are part of the research path, not failed marketing.
+- **Persistence is not predictive value.** A coefficient can survive while forecast utility dies.
+- **Model trust is dynamic.** Non-stationarity applies to models as well as individual signals.
+- **Complexity must be motivated by a failure mode.** Each major layer exists because a simpler method exposed a specific weakness.
+- **Optimisation follows profiling.** C++ accelerates a measured bottleneck rather than serving as decoration.
 
-**Negative results remain visible.** They are part of the research path, not failed marketing.
+## Independence and confidentiality
 
-**Persistence is not predictive value.** A coefficient can survive while its forecast contribution
-dies.
-
-**Model trust is dynamic.** Non-stationarity applies to models as well as individual signals.
-
-**Complexity must be motivated by a failure mode.** Every major layer exists because the previous
-simpler method exposed a specific weakness.
-
-**Optimisation follows profiling.** C++ accelerates a measured bottleneck rather than serving as CV
-decoration.
-
-## Independence / confidentiality
-
-This repository is independently developed using public data and synthetic tests. It contains no
-employer data, code, models or proprietary research.
+This repository is independently developed using public data and synthetic tests. It contains no employer data, code, models or proprietary research.

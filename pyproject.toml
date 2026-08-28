@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "market-information-dynamics"
-version = "0.7.0"
-description = "Dynamic information-flow research across financial markets and the physical economy."
+version = "1.0.0"
+description = "Online model trust, signal survival and alternative-data forecasting under non-stationarity."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -38,3 +38,6 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
+
+[project.urls]
+Repository = "https://github.com/elizadnl/market-information-dynamics"

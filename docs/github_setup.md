@@ -6,7 +6,7 @@ After downloading/unzipping the repository:
 cd market-information-dynamics
 git init
 git add .
-git commit -m "Initial research engine"
+git commit -m "Initial research release"
 git branch -M main
 ```
 
@@ -18,4 +18,4 @@ git push -u origin main
 ```
 
 Do not commit API keys or downloaded data whose licence does not permit redistribution.
-`FRED_API_KEY` belongs in your local environment, not in the repository.
+If you choose to use a FRED API key, keep `FRED_API_KEY` in your local environment rather than the repository. The default public-data path can run without committing credentials.

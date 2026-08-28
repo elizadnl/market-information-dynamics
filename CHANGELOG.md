@@ -1,3 +1,11 @@
+## 1.0.0 — recruiter-facing research release
+
+- Freezes the v0.7 methodology; no statistical rules or historical results are changed.
+- Reframes the README around online model trust under non-stationarity rather than the candidate data domain.
+- Adds a compact research architecture and recruiter-readable 30-second overview.
+- Adds `docs/RESEARCH_NOTE.md` as a self-contained technical research note.
+- Keeps negative empirical evidence, prospective protocol and confidentiality statement explicit.
+
 ## 0.7.0 — online expert aggregation and prospective freeze
 
 - Freezes the empirical-v3 diagnostic result: the protected-core gate reduced candidate-model damage but did not robustly beat the financial core.

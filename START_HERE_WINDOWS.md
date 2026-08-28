@@ -1,4 +1,4 @@
-# Windows quick start — v0.7
+# Windows quick start — v1.0
 
 Run these commands from the repository root.
 
