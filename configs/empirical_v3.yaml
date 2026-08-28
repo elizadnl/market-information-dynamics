@@ -1,0 +1,68 @@
+# Candidate-overlay experiment.
+# v2 showed that edge survival reduced some damage from a full physical+financial model,
+# but the selected model still usually lost to the financial-only core. v3 therefore
+# protects the financial model and forces candidate data to explain realised OOS residuals.
+targets:
+  - audusd
+  - brlusd
+  - cnyusd
+  - krwusd
+  - eurusd
+  - sp500
+  - vix
+  - us2y
+  - us10y
+  - wti
+  - brent
+  - henry_hub
+
+horizons: [1, 5, 10, 20]
+
+model:
+  lags: 5
+  alpha: 0.035
+  ar_alpha: 1.0
+  min_train: 750
+  refit_every: 20
+
+overlay:
+  # The overlay is fitted only to fully realised OOS residuals from the financial core.
+  alpha: 0.04
+  min_oos_residuals: 120
+  post_selection_ridge_alpha: 2.0
+
+survival:
+  edge_threshold: 0.05
+  structural_half_life_days: 180
+  contribution_half_life_days: 120
+  min_selection_frequency: 0.55
+  min_sign_stability: 0.65
+  min_strength_retention: 0.50
+  min_contributions: 20
+  min_survival_snapshots: 6
+  max_edges_per_target: 4
+
+adaptive_gate:
+  # Entire candidate overlay must also prove net realised value versus the protected core.
+  half_life_days: 120
+  min_observations: 30
+  t_scale: 2.0
+
+evaluation:
+  development_end: 2024-12-31
+  # This period has already informed v1/v2 design and is diagnostic only, not confirmatory.
+  reused_evaluation_start: 2025-01-01
+  prospective_start: 2026-09-01
+
+forecast_test:
+  base_hac_lags: 5
+  fdr_q: 0.10
+  comparisons:
+    - [ar, financial_direct_sparse]
+    - [financial_direct_sparse, candidate_overlay_sparse]
+    - [financial_direct_sparse, candidate_overlay_survival]
+    - [financial_direct_sparse, candidate_overlay_adaptive]
+    - [candidate_overlay_survival, candidate_overlay_adaptive]
+
+report:
+  lifecycle_edges: 6

@@ -1,152 +1,185 @@
 # Market Information Dynamics
 
-### Predictive information, signal survival and non-stationarity across markets and the physical economy
+### Online signal survival, candidate-data augmentation and non-stationarity across markets
 
-**Research question:** when a lagged relationship appears predictive, how can we distinguish a
-signal that is genuinely useful out of sample from one that is merely persistent in-sample?
+**Research question:** when a new data domain appears predictive, how can we tell whether it adds
+real forecasting information beyond an existing model — and when should that augmentation be
+switched off?
 
-This repository treats markets as a **non-stationary predictive network**. Directed edges mean
-that one lagged series contributes incremental forecasting information for another under an
-explicit model. They are not labelled as structural causal links.
+This is an independent public-data quantitative-research project. It uses financial-market data
+as a **protected core model** and treats physical-economy data as a difficult candidate information
+layer. The statistical machinery is deliberately general: candidate features could later be
+satellite, web, sentiment, microstructure or other alternative data.
 
-> **Status — v0.5:** empirical v1 has now been run on public FRED + IMF PortWatch data and is
-> frozen in the repository. Its physical-data hypothesis was a useful null result: the
-> financial+physical model did not robustly beat the financial-only model on one-day forecasts,
-> and no physical-data improvement survived FDR control. That failure motivates empirical v2,
-> which replaces cumulative coefficient persistence with **online predictive-edge survival**:
-> direct 1/5/10/20-day forecasts, recency-weighted structural evidence, realised marginal OOS
-> loss attribution, and post-selection refitting. v2 is implemented but its result is not
-> claimed here until it is run on the public panel.
+> **Status — v0.6:** two real public-data experiments have already produced useful negative and
+> partial results. Empirical v1 found no robust one-day incremental value from the baseline
+> PortWatch layer. Empirical v2 showed that online edge-survival filtering reduced some of the
+> damage from the full model at longer horizons, but still usually failed to beat the financial
+> core and produced no FDR-significant improvement. v0.6 therefore implements a stricter
+> **protected-core candidate overlay** trained only on fully realised out-of-sample core residuals,
+> with both edge-level and model-level survival gates.
 
-![Empirical v1 incremental physical-data skill](artifacts/empirical_v1_public/physical_incremental_skill.png)
+![Empirical v2 horizon skill](artifacts/empirical_v2_public/horizon_skill_reused_holdout.png)
 
-## Why the project changed after the first real experiment
+## Research progression
 
-Empirical v1 asked a deliberately simple question:
+### Empirical v1 — does physical data add one-day information?
 
-> Does a baseline physical-economy layer built from public PortWatch chokepoint activity add
-> one-day predictive information beyond financial-market history?
+The first real experiment compared an AR benchmark, a financial sparse model and a
+financial+PortWatch sparse model. On the 2025+ reporting segment, adding the physical layer had
+about **-0.10% mean incremental RMSE skill** across 12 targets. No improvement survived FDR.
+The result remained weak under pre-specified 7/10/14/21-day PortWatch availability-lag checks.
 
-The answer was essentially **no**. On the 2025+ reporting segment, mean incremental RMSE skill
-from adding the physical layer was about **-0.10%** across 12 targets, and no improvement
-survived Benjamini-Hochberg FDR correction. The conclusion remained weak/negative under the
-pre-specified PortWatch availability-lag sensitivity.
+That null result is preserved rather than hidden.
 
-The more interesting observation was that **edge persistence itself was not enough**. Some
-source→target relationships were repeatedly selected by LASSO with a stable sign while still
-failing to improve subsequent forecast loss. That turns the project into a sharper general
-quantitative-research problem:
+### Empirical v2 — can persistent edges be trusted?
 
-> **When should a predictive relationship be trusted, and when should it be killed?**
+v2 moved to direct 1/5/10/20-day forecasting and scored edges using recency-weighted structural
+persistence plus realised OOS loss contribution.
 
-See [`docs/empirical_v1_findings.md`](docs/empirical_v1_findings.md) and the frozen evidence in
-[`artifacts/empirical_v1_public/`](artifacts/empirical_v1_public/).
+On the reused 2025+ evaluation segment, mean RMSE skill versus direct AR was:
 
-## Empirical v2: predictive edge survival
+| Horizon | Financial-only | Full financial+physical | Survival-refit full |
+|---:|---:|---:|---:|
+| 1 | +1.04% | +0.94% | +0.13% |
+| 5 | -0.06% | -1.65% | -1.50% |
+| 10 | -0.32% | -2.47% | -1.35% |
+| 20 | -0.14% | -4.66% | -2.87% |
 
-For every horizon `h ∈ {1, 5, 10, 20}`, v2 fits a **direct** sparse forecasting model. At
-forecast origin `t`, predictors use only data through `t-1`, while the target is the cumulative
-transformed move over the next `h` trading days:
+The survival filter reduced error relative to the unfiltered full model on **7/12 targets at
+10 days** and **8/12 at 20 days**, but the system still generally lost to the financial-only core.
+No target/horizon comparison survived Benjamini-Hochberg FDR correction.
+
+That exposed a more precise problem: an edge can help *inside a bad candidate model* without
+adding value over the baseline we actually care about.
+
+See [`docs/empirical_v2_findings.md`](docs/empirical_v2_findings.md).
+
+## Empirical v3 — protected-core candidate overlay
+
+v0.6 changes the architecture rather than adding another generic ML model.
+
+For each horizon `h ∈ {1, 5, 10, 20}`:
+
+1. fit the financial-only direct sparse model;
+2. generate walk-forward core forecasts;
+3. wait until each h-day outcome fully realises;
+4. store the genuine OOS residual:
 
 ```text
-y(t,h) = x[t] + x[t+1] + ... + x[t+h-1]
+residual = realised_target - core_forecast
 ```
 
-The model does not recursively feed its own predictions forward.
+5. fit a sparse candidate-data model **only to those realised OOS residuals**;
+6. evaluate each candidate edge directly against the financial core;
+7. refit only surviving candidate edges;
+8. shrink the complete overlay toward zero unless the augmented model itself has positive recent
+   realised OOS value.
 
-Every selected cross-series edge is then evaluated using a counterfactual forecast with that
-edge removed. Once the full outcome horizon has actually realised, the edge receives a
-marginal OOS loss contribution:
+The final forecast is:
 
 ```text
-ΔL = squared_loss_without_edge - squared_loss_with_edge
+forecast = financial_core + adaptive_gate * surviving_candidate_overlay
 ```
 
-Positive `ΔL` means the edge helped. An edge cannot use its own future outcome to survive.
+The candidate layer therefore cannot replace the financial core. With insufficient or negative
+recent evidence, the gate is exactly zero and the system falls back to the core forecast.
 
-The survival state combines:
+### Why this is stricter than v2
 
-- recency-weighted LASSO selection frequency;
-- recency-weighted sign stability;
-- current coefficient strength relative to recent strength;
-- recency-weighted realised OOS marginal loss improvement;
-- contribution hit rate / effective-sample t-statistic.
+v2 measured:
 
-Old structural evidence has a finite half-life, and realised predictive evidence decays even
-faster. A relationship that was useful a year ago therefore cannot remain “stable” forever by
-construction.
+```text
+loss(full model without edge) - loss(full model with edge)
+```
 
-![Synthetic signal-survival failure](artifacts/synthetic_signal_survival.png)
+v3 measures candidate-edge value relative to the protected baseline:
 
-The controlled example above deliberately changes the true `x → y` relationship. The LASSO
-edge remains selected with a stable sign for a long period because expanding-window history is
-still dominated by the old regime; the predictive-survival score collapses once recent realised
-forecast contribution becomes negative.
+```text
+loss(financial core) - loss(financial core + candidate edge adjustment)
+```
 
-### Post-selection refitting
+and then separately asks whether the **joint selected overlay** improves the same core after
+interactions and refitting.
 
-LASSO is used to discover sparse structure. Once a source set survives, the final forecast is
-**refit with Ridge conditional on the surviving predictors**. The model is not produced by
-simply zeroing unwanted coefficients from the original LASSO fit. Self-lags are always retained.
+That creates two independent survival requirements:
 
-### Nested forecast tests
+- **edge survival:** does this candidate relationship itself keep helping?
+- **overlay survival:** does the complete augmentation still help after combining surviving edges?
 
-v2 pre-specifies three model comparisons for every target/horizon pair:
+See [`docs/empirical_v3.md`](docs/empirical_v3.md).
 
-1. direct AR → financial-only direct sparse model;
-2. financial-only → financial + physical direct sparse model;
-3. full sparse model → survival-filtered post-selection refit.
+## Controlled falsification test
 
-Because multi-day cumulative outcomes overlap, the HAC lag is at least `h-1`. FDR is applied
-across target/horizon tests within each comparison family.
+The repository contains a synthetic regime where candidate information genuinely improves a
+financial core and is then deliberately removed. The adaptive overlay first learns to trust the
+candidate layer and later closes the gate as realised OOS contribution deteriorates.
 
-See [`docs/empirical_v2.md`](docs/empirical_v2.md).
+![Protected-core overlay demo](artifacts/synthetic_candidate_overlay_gate.png)
 
-## Evaluation honesty
+In the controlled example, overall RMSE ranks:
 
-The 2025+ period was already inspected in empirical v1. Once v2 was motivated by those results,
-that period stopped being a pristine confirmatory holdout. The repository therefore labels it
-**reused holdout** in v2 rather than pretending otherwise.
+```text
+candidate_overlay_adaptive  <  candidate_overlay_survival
+                            <  candidate_overlay_sparse
+                            <  financial_direct_sparse
+                            <  AR
+```
 
-- method development: through 2024-12-31;
-- reused secondary evaluation: 2025-01-01 onward;
-- prospective validation: observations from 2026-09-01 onward as they become available.
+The point is not the synthetic RMSE number; it is that the gate has known ground truth and must
+switch off a signal that actually dies.
 
-This distinction is part of the research design, not a footnote.
+## Statistical design
 
-## Public-data layer
+The project includes:
 
-The project contains no employer/proprietary data.
+- direct 1/5/10/20-day forecasts rather than recursive multi-step forecasts;
+- expanding walk-forward estimation;
+- LASSO sparse structure discovery;
+- OOS-residual candidate-layer training;
+- recency-weighted edge selection/sign/strength diagnostics;
+- candidate-edge loss attribution relative to a protected core;
+- post-selection Ridge refitting;
+- an adaptive model-level overlay gate;
+- horizon-aware HAC Diebold-Mariano-style forecast comparisons;
+- Benjamini-Hochberg FDR control;
+- point-in-time alternative-data availability rules;
+- explicit reused-evaluation vs prospective-validation labels;
+- synthetic regime-switch falsification tests.
 
-- **FRED:** daily FX, equities, volatility, rates and energy series, downloaded at run time.
-- **IMF PortWatch:** public chokepoint data retrieved in small cacheable year-by-year requests.
-- **Point-in-time treatment:** physical features are delayed by an explicit availability lag;
-  the live historical PortWatch feed is not misrepresented as a perfect historical vintage
-  database.
-- **Physical features:** past-only smoothed 52-week seasonal anomalies rather than raw levels.
+Directed edges mean lagged predictive association under the fitted model, **not structural
+causality**.
+
+## Public data
+
+No employer or proprietary data are included.
+
+- **FRED:** daily FX, equities, volatility, rates and energy series.
+- **IMF PortWatch:** public chokepoint activity retrieved in small resumable year/chokepoint
+  requests.
+- **Timing:** physical features receive an explicit assumed availability lag; the live historical
+  feed is not misrepresented as a perfect historical vintage archive.
+- **Transforms:** past-only smoothing and 52-week seasonal anomalies for the physical layer.
 
 See [`docs/data_provenance.md`](docs/data_provenance.md).
 
-## Research stack
+## Evaluation honesty
 
-- sparse LASSO predictive networks;
-- direct multi-horizon forecasting;
-- expanding walk-forward evaluation;
-- online edge-level forecast-loss attribution;
-- exponentially decayed signal-survival statistics;
-- post-selection Ridge refitting;
-- HAC Diebold-Mariano-style forecast comparisons;
-- Benjamini-Hochberg multiple-testing control;
-- point-in-time panel construction and automatic data audits;
-- controlled synthetic regime-switch validation;
-- optional C++17 acceleration for repeated lagged-design construction.
+The chronology is intentionally visible in Git history:
 
-## Why there is C++ here
+- empirical v1 inspected 2025+;
+- v2 was motivated by v1, so 2025+ became a **reused evaluation period**;
+- v3 was motivated by v2, so that period remains diagnostic rather than being relabelled a fresh
+  holdout;
+- prospective observations after the method is frozen are reserved for genuine confirmation.
 
-The project is intentionally Python-first because research iteration speed matters. C++ is
-used only for a measured deterministic hot path: lagged-design-matrix construction inside
-repeated rolling fits. The native path has exact Python parity tests, benchmarks, CI coverage
-and an automatic Python fallback.
+Negative results stay in the repository because they determine the next hypothesis.
+
+## Why there is C++
+
+The research stack is Python-first. C++17 is used only for a measured deterministic hot path:
+repeated lagged-design-matrix construction. The native kernel has exact Python parity tests,
+benchmarks, CI coverage and an automatic Python fallback.
 
 See [`docs/cpp_acceleration.md`](docs/cpp_acceleration.md).
 
@@ -157,121 +190,122 @@ See [`docs/cpp_acceleration.md`](docs/cpp_acceleration.md).
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\setup_windows.ps1
 
-# Reuse the public panel already downloaded by empirical v1, or build it if absent.
-powershell -ExecutionPolicy Bypass -File scripts\run_signal_survival.ps1
+# v3 uses the existing public panel, so no PortWatch redownload is needed if v1 already ran.
+powershell -ExecutionPolicy Bypass -File scripts\run_candidate_overlay.ps1
 ```
 
 ### Cross-platform
 
 ```bash
 python -m venv .venv
-# activate the environment, then:
+# activate the environment
 pip install -e .[dev]
 pytest
 
-# Build public FRED + PortWatch panel if needed
-python -m market_information_dynamics.cli public-pilot --start 2019-01-01
-
-# Run predictive-edge-survival experiment
-python -m market_information_dynamics.cli empirical-v2 \
+python -m market_information_dynamics.cli empirical-v3 \
   --panel data/processed/public_pilot.csv \
-  --experiment-config configs/empirical_v2.yaml \
-  --out artifacts/empirical_v2
+  --financial-config configs/universe_v1.yaml \
+  --experiment-config configs/empirical_v3.yaml \
+  --out artifacts/empirical_v3
 ```
 
-v2 produces a separate evidence directory for every horizon, plus combined metrics, nested
-forecast tests, latest edge-survival scores, lifecycle plots and a generated `RESULTS.md`.
+Controlled demonstrations:
 
-## Synthetic validation
-
-Before any real-market claim, the repository also runs a controlled synthetic system where the
-true directed relationships are known and one edge deliberately weakens through time. This is
-a falsifiability check: a research engine that cannot recover known structure should not be
-trusted to draw attractive networks from financial data.
+```bash
+python -m market_information_dynamics.cli survival-demo
+python -m market_information_dynamics.cli overlay-demo
+```
 
 ## Leakage rules
 
 1. No random train/test split for time-series claims.
-2. No scaling or feature selection on future observations.
-3. No alternative-data value before its assumed availability date.
-4. No multi-horizon edge contribution enters survival until the whole outcome horizon realises.
-5. No revised history is silently treated as historical real-time information.
-6. No choosing the best target/horizon and presenting it as the original hypothesis.
-7. Overlapping multi-day forecast losses use horizon-aware HAC inference.
-8. Multiple target/horizon tests are corrected within pre-specified comparison families.
-9. Reused holdouts are labelled as reused holdouts.
-10. Prediction is not causation.
+2. No scaler, feature selection or survival statistic may use future observations.
+3. Candidate-data observations cannot enter before their assumed availability date.
+4. h-day outcomes cannot affect training/survival until the full horizon has realised.
+5. Candidate overlay targets are historical **OOS core residuals**, not in-sample residuals.
+6. Edge contribution is measured against the protected core, not merely inside the candidate model.
+7. Model-level overlay evidence is separately realised before it can affect the adaptive gate.
+8. Overlapping h-day forecast-loss tests use horizon-aware HAC inference.
+9. Multiple target/horizon tests are corrected within pre-specified comparison families.
+10. Reused evaluation periods are labelled honestly; prediction is not causation.
 
 ## Repository layout
 
 ```text
 configs/
 ├── empirical_v1.yaml
-└── empirical_v2.yaml
+├── empirical_v2.yaml
+└── empirical_v3.yaml
 cpp/
 └── lagged_design.cpp
 scripts/
 ├── setup_windows.ps1
 ├── run_public_research.ps1
-└── run_signal_survival.ps1
+├── run_signal_survival.ps1
+└── run_candidate_overlay.ps1
 src/market_information_dynamics/
-├── data/                  # public-data ingestion, timing and transforms
-├── compute/               # Python/C++ lagged-design backend
+├── data/
+├── compute/
 ├── models/
-│   ├── sparse_var.py
-│   └── direct_sparse.py   # direct h-day sparse forecast model + post-selection refit
+│   ├── direct_sparse.py
+│   └── residual_overlay.py
 ├── evaluation/
-│   ├── empirical.py       # frozen empirical v1
-│   ├── multi_horizon.py   # online edge attribution and survival forecasting
-│   └── empirical_v2.py
+│   ├── empirical.py
+│   ├── multi_horizon.py
+│   ├── empirical_v2.py
+│   ├── candidate_overlay.py
+│   └── empirical_v3.py
 ├── statistics/
 │   ├── signal_survival.py
-│   ├── nested_forecast_tests.py
-│   └── forecast_tests.py
+│   ├── overlay_gate.py
+│   └── nested_forecast_tests.py
 └── visualization/
-    └── survival.py
+    ├── survival.py
+    └── overlay.py
 artifacts/
-├── empirical_v1_public/   # frozen public-data v1 evidence pack
+├── empirical_v1_public/
+├── empirical_v2_public/
 └── synthetic_*
 ```
 
 ## Research principles
 
-**Negative results stay visible.** Empirical v1's null result is part of the project because it
-changed the research question in a falsifiable way.
+**A new data source must earn incremental value.** The baseline model is protected; candidate data
+are an augmentation, not a licence to rebuild the whole system until something backtests well.
 
-**Complexity must earn its place.** A new statistical method is added only when a concrete
-failure of the simpler model motivates it.
+**Negative results are useful information.** v1 and v2 are preserved because each failure exposed
+a more precise statistical question.
 
-**Predictive persistence is not predictive value.** A stable coefficient is evidence about a
-fitted model; realised OOS loss reduction is evidence about forecast usefulness.
+**Persistence is not value.** Selection frequency and coefficient stability are model diagnostics;
+realised OOS loss reduction is the quantity that determines forecast usefulness.
 
-**Optimisation follows profiling.** C++ accelerates a measured hot path rather than serving as
-CV decoration.
+**Complexity must be motivated by failure.** v3 exists because v2's edge-survival definition was
+not strict enough relative to the financial baseline.
+
+**Optimisation follows profiling.** C++ accelerates a real bottleneck rather than serving as CV
+decoration.
 
 ## Independence / confidentiality
 
-This is an independent public-data research project inspired by broader questions about how
-information moves between the physical economy and financial markets. It contains no employer
-data, code, models or proprietary research.
+This repository is independently developed from public sources. It contains no employer data,
+code, models or proprietary research.
 
 ## Roadmap
 
 - [x] Sparse directed lag model
 - [x] Leakage-safe walk-forward engine
-- [x] Point-in-time public-data layer
-- [x] Synthetic regime-switch validation
+- [x] Public point-in-time data layer
 - [x] Optional C++17 hot-path kernel + parity CI
-- [x] Empirical v1 + frozen evidence pack
-- [x] Preserve/report the v1 physical-data null result
-- [x] Direct 1/5/10/20-day forecast models
-- [x] Online edge-level OOS loss attribution
-- [x] Recency-weighted signal survival
-- [x] Post-selection Ridge refitting
-- [x] Horizon-aware nested forecast tests + FDR
-- [x] Signal lifecycle visualisation
-- [ ] Run/freeze empirical v2 evidence pack
-- [ ] Add prospective post-2026-09 observations without retuning
-- [ ] Block-bootstrap / permutation edge-significance robustness
-- [ ] Online change-point model if survival diagnostics justify it
-- [ ] Final research report + robustness appendix
+- [x] Empirical v1 + frozen null result
+- [x] Multi-horizon predictive-edge survival
+- [x] Empirical v2 + frozen partial/null result
+- [x] Protected financial core
+- [x] Cross-fitted OOS-residual candidate overlay
+- [x] Edge attribution relative to the protected core
+- [x] Adaptive model-level overlay gate
+- [ ] Run/freeze empirical v3 evidence pack
+- [ ] Freeze methodology before prospective September-2026+ scoring
+- [ ] Add immutable prospective forecast ledger
+- [ ] Block-bootstrap / permutation robustness for candidate edges
+- [ ] External candidate-domain validation only if the frozen method justifies it
+- [ ] Final research note + robustness appendix

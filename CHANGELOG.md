@@ -1,3 +1,15 @@
+## 0.6.0 — protected-core candidate overlay
+
+- Freezes the real empirical-v2 evidence pack and records its partial/null result.
+- Treats the financial-only model as a protected core rather than allowing candidate data to replace it.
+- Trains candidate-domain models only on fully realised out-of-sample residuals from historical core forecasts.
+- Redefines candidate-edge utility relative to the protected core forecast itself.
+- Adds post-selection residual-overlay refitting and a second model-level adaptive gate.
+- The adaptive gate is zero unless recent realised OOS overlay contribution is positive with sufficient history.
+- Adds an empirical-v3 pipeline for 1/5/10/20-day horizons plus candidate-edge, gate and residual diagnostics.
+- Adds a controlled regime-switch demonstration where useful candidate data die and the gate closes.
+- Test suite expanded to 39 tests; all 39 pass when the optional native C++ backend is built.
+
 ## 0.5.0 — predictive edge survival
 
 - Freezes the first real public-data evidence pack in `artifacts/empirical_v1_public/`.

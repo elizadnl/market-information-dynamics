@@ -18,10 +18,13 @@ from market_information_dynamics.data.portwatch import (
 )
 from market_information_dynamics.demo import run_demo
 from market_information_dynamics.demo_survival import run_survival_demo
+from market_information_dynamics.demo_overlay import run_overlay_demo
 from market_information_dynamics.evaluation.empirical import run_empirical_v1
 from market_information_dynamics.evaluation.empirical_v2 import run_empirical_v2
+from market_information_dynamics.evaluation.empirical_v3 import run_empirical_v3
 from market_information_dynamics.reporting import write_empirical_markdown
 from market_information_dynamics.reporting_v2 import write_empirical_v2_markdown
+from market_information_dynamics.reporting_v3 import write_empirical_v3_markdown
 from market_information_dynamics.visualization.empirical import (
     plot_oos_skill,
     plot_physical_incremental_skill,
@@ -30,6 +33,7 @@ from market_information_dynamics.visualization.survival import (
     plot_horizon_skill,
     plot_survival_lifecycle,
 )
+from market_information_dynamics.visualization.overlay import plot_gate_lifecycle
 
 
 def _financial_ids(config_path: str) -> list[str]:
@@ -183,6 +187,74 @@ def _run_empirical_v2_from_panel(
     print(f"Wrote empirical v2 signal-survival outputs to {out}")
 
 
+
+def _run_empirical_v3_from_panel(
+    panel: pd.DataFrame,
+    *,
+    financial_config: str,
+    experiment_config: str,
+    out_dir: str,
+) -> None:
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    financial_columns = _financial_ids(financial_config)
+    result = run_empirical_v3(
+        panel, financial_columns=financial_columns, config_path=experiment_config
+    )
+    result.metrics.to_csv(out / "metrics.csv", index=False)
+    result.forecast_tests.to_csv(out / "nested_forecast_tests.csv", index=False)
+    result.latest_survival.to_csv(out / "latest_candidate_edge_survival.csv", index=False)
+    result.latest_gates.to_csv(out / "latest_overlay_gates.csv", index=False)
+
+    for horizon, h_result in result.horizon_results.items():
+        h_dir = out / f"h{horizon}"
+        h_dir.mkdir(parents=True, exist_ok=True)
+        h_result.actuals.to_csv(h_dir / "actuals.csv")
+        for model_name, frame in h_result.predictions.items():
+            frame.to_csv(h_dir / f"predictions_{model_name}.csv")
+        h_result.overlay_edge_snapshots.to_csv(
+            h_dir / "candidate_edge_snapshots.csv", index=False
+        )
+        h_result.overlay_edge_contributions.to_csv(
+            h_dir / "candidate_edge_contributions.csv", index=False
+        )
+        h_result.survival_history.to_csv(h_dir / "survival_history.csv", index=False)
+        h_result.gate_history.to_csv(h_dir / "gate_history.csv", index=False)
+        h_result.model_contributions.to_csv(
+            h_dir / "overlay_model_contributions.csv", index=False
+        )
+        h_result.core_residuals.to_csv(h_dir / "core_oos_residuals.csv")
+
+    for segment in ["oos_all", "development", "reused_evaluation"]:
+        if (result.metrics["segment"] == segment).any():
+            plot_horizon_skill(
+                result.metrics,
+                out / f"horizon_skill_{segment}.png",
+                segment=segment,
+            )
+
+    if not result.latest_gates.empty:
+        topg = result.latest_gates.sort_values("gate", ascending=False).head(8)
+        for row in topg.itertuples(index=False):
+            history = result.horizon_results[int(row.horizon)].gate_history
+            safe_target = str(row.target).replace("/", "_")
+            plot_gate_lifecycle(
+                history,
+                target=row.target,
+                horizon=int(row.horizon),
+                output=out / f"gate_h{int(row.horizon)}_{safe_target}.png",
+            )
+
+    write_empirical_v3_markdown(
+        result.metrics,
+        result.forecast_tests,
+        result.latest_survival,
+        result.latest_gates,
+        output=out / "RESULTS.md",
+    )
+    print(f"Wrote empirical v3 candidate-overlay outputs to {out}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="market-information-dynamics")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -195,6 +267,11 @@ def main() -> None:
         "survival-demo", help="Run the controlled predictive-edge death demonstration"
     )
     survival_demo.add_argument("--out", default="artifacts")
+
+    overlay_demo = sub.add_parser(
+        "overlay-demo", help="Run the protected-core candidate-overlay gate demonstration"
+    )
+    overlay_demo.add_argument("--out", default="artifacts")
 
     fred = sub.add_parser("fred-pilot", help="Download the configured public FRED pilot panel")
     fred.add_argument("--config", default="configs/universe_v0.yaml")
@@ -234,6 +311,15 @@ def main() -> None:
     empirical_v2.add_argument("--experiment-config", default="configs/empirical_v2.yaml")
     empirical_v2.add_argument("--out", default="artifacts/empirical_v2")
 
+    empirical_v3 = sub.add_parser(
+        "empirical-v3",
+        help="Run protected-core candidate-overlay research on an existing public panel",
+    )
+    empirical_v3.add_argument("--panel", default="data/processed/public_pilot.csv")
+    empirical_v3.add_argument("--financial-config", default="configs/universe_v1.yaml")
+    empirical_v3.add_argument("--experiment-config", default="configs/empirical_v3.yaml")
+    empirical_v3.add_argument("--out", default="artifacts/empirical_v3")
+
     research = sub.add_parser(
         "public-research", help="Download public data and run primary + lag-sensitivity research"
     )
@@ -257,6 +343,11 @@ def main() -> None:
     elif args.command == "survival-demo":
         paths = run_survival_demo(out_dir=args.out)
         print("Signal-survival demo complete:")
+        for key, value in paths.items():
+            print(f"  {key}: {value}")
+    elif args.command == "overlay-demo":
+        paths = run_overlay_demo(out_dir=args.out)
+        print("Candidate-overlay demo complete:")
         for key, value in paths.items():
             print(f"  {key}: {value}")
     elif args.command == "fred-pilot":
@@ -374,6 +465,14 @@ def main() -> None:
     elif args.command == "empirical-v2":
         panel = pd.read_csv(args.panel, index_col=0, parse_dates=True)
         _run_empirical_v2_from_panel(
+            panel,
+            financial_config=args.financial_config,
+            experiment_config=args.experiment_config,
+            out_dir=args.out,
+        )
+    elif args.command == "empirical-v3":
+        panel = pd.read_csv(args.panel, index_col=0, parse_dates=True)
+        _run_empirical_v3_from_panel(
             panel,
             financial_config=args.financial_config,
             experiment_config=args.experiment_config,
