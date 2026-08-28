@@ -19,12 +19,15 @@ from market_information_dynamics.data.portwatch import (
 from market_information_dynamics.demo import run_demo
 from market_information_dynamics.demo_survival import run_survival_demo
 from market_information_dynamics.demo_overlay import run_overlay_demo
+from market_information_dynamics.demo_online import run_online_demo
 from market_information_dynamics.evaluation.empirical import run_empirical_v1
 from market_information_dynamics.evaluation.empirical_v2 import run_empirical_v2
 from market_information_dynamics.evaluation.empirical_v3 import run_empirical_v3
+from market_information_dynamics.evaluation.empirical_v4 import run_empirical_v4
 from market_information_dynamics.reporting import write_empirical_markdown
 from market_information_dynamics.reporting_v2 import write_empirical_v2_markdown
 from market_information_dynamics.reporting_v3 import write_empirical_v3_markdown
+from market_information_dynamics.reporting_v4 import write_empirical_v4_markdown
 from market_information_dynamics.visualization.empirical import (
     plot_oos_skill,
     plot_physical_incremental_skill,
@@ -34,6 +37,7 @@ from market_information_dynamics.visualization.survival import (
     plot_survival_lifecycle,
 )
 from market_information_dynamics.visualization.overlay import plot_gate_lifecycle
+from market_information_dynamics.visualization.online import plot_expert_weights
 
 
 def _financial_ids(config_path: str) -> list[str]:
@@ -255,6 +259,53 @@ def _run_empirical_v3_from_panel(
     print(f"Wrote empirical v3 candidate-overlay outputs to {out}")
 
 
+
+def _run_empirical_v4_from_artifacts(
+    *,
+    v3_dir: str,
+    experiment_config: str,
+    out_dir: str,
+) -> None:
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    result = run_empirical_v4(v3_dir=v3_dir, config_path=experiment_config)
+    result.metrics.to_csv(out / "metrics.csv", index=False)
+    result.forecast_tests.to_csv(out / "nested_forecast_tests.csv", index=False)
+    result.latest_weights.to_csv(out / "latest_expert_weights.csv", index=False)
+    result.share_sensitivity.to_csv(out / "share_sensitivity.csv", index=False)
+
+    for horizon, h_result in result.horizon_results.items():
+        h_dir = out / f"h{horizon}"
+        h_dir.mkdir(parents=True, exist_ok=True)
+        h_result.actuals.to_csv(h_dir / "actuals.csv")
+        for model_name, frame in h_result.predictions.items():
+            frame.to_csv(h_dir / f"predictions_{model_name}.csv")
+        h_result.weight_history.to_csv(h_dir / "expert_weight_history.csv", index=False)
+        h_result.realised_losses.to_csv(h_dir / "realised_expert_losses.csv", index=False)
+
+    if not result.latest_weights.empty:
+        top = result.latest_weights.loc[
+            result.latest_weights["expert"] != "financial_direct_sparse"
+        ].sort_values("weight", ascending=False).head(8)
+        for row in top.itertuples(index=False):
+            history = result.horizon_results[int(row.horizon)].weight_history
+            safe_target = str(row.target).replace("/", "_")
+            plot_expert_weights(
+                history,
+                target=row.target,
+                horizon=int(row.horizon),
+                output=out / f"weights_h{int(row.horizon)}_{safe_target}.png",
+            )
+
+    write_empirical_v4_markdown(
+        result.metrics,
+        result.forecast_tests,
+        result.latest_weights,
+        result.share_sensitivity,
+        output=out / "RESULTS.md",
+    )
+    print(f"Wrote empirical v4 online-aggregation outputs to {out}")
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="market-information-dynamics")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -272,6 +323,11 @@ def main() -> None:
         "overlay-demo", help="Run the protected-core candidate-overlay gate demonstration"
     )
     overlay_demo.add_argument("--out", default="artifacts")
+
+    online_demo = sub.add_parser(
+        "online-demo", help="Run the Fixed-Share regime-switch demonstration"
+    )
+    online_demo.add_argument("--out", default="artifacts")
 
     fred = sub.add_parser("fred-pilot", help="Download the configured public FRED pilot panel")
     fred.add_argument("--config", default="configs/universe_v0.yaml")
@@ -320,6 +376,15 @@ def main() -> None:
     empirical_v3.add_argument("--experiment-config", default="configs/empirical_v3.yaml")
     empirical_v3.add_argument("--out", default="artifacts/empirical_v3")
 
+
+    empirical_v4 = sub.add_parser(
+        "empirical-v4",
+        help="Causally aggregate v3 forecast experts with Fixed-Share",
+    )
+    empirical_v4.add_argument("--v3-dir", default="artifacts/empirical_v3")
+    empirical_v4.add_argument("--experiment-config", default="configs/empirical_v4.yaml")
+    empirical_v4.add_argument("--out", default="artifacts/empirical_v4")
+
     research = sub.add_parser(
         "public-research", help="Download public data and run primary + lag-sensitivity research"
     )
@@ -348,6 +413,11 @@ def main() -> None:
     elif args.command == "overlay-demo":
         paths = run_overlay_demo(out_dir=args.out)
         print("Candidate-overlay demo complete:")
+        for key, value in paths.items():
+            print(f"  {key}: {value}")
+    elif args.command == "online-demo":
+        paths = run_online_demo(out_dir=args.out)
+        print("Online Fixed-Share demo complete:")
         for key, value in paths.items():
             print(f"  {key}: {value}")
     elif args.command == "fred-pilot":
@@ -475,6 +545,12 @@ def main() -> None:
         _run_empirical_v3_from_panel(
             panel,
             financial_config=args.financial_config,
+            experiment_config=args.experiment_config,
+            out_dir=args.out,
+        )
+    elif args.command == "empirical-v4":
+        _run_empirical_v4_from_artifacts(
+            v3_dir=args.v3_dir,
             experiment_config=args.experiment_config,
             out_dir=args.out,
         )

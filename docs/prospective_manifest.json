@@ -1,0 +1,12 @@
+{
+  "frozen_on": "2026-08-28",
+  "prospective_start": "2026-09-01",
+  "files": {
+    "configs/empirical_v3.yaml": "418d1984dcfa9268ec6db98fc5a05ee2bc7ec35ee873483816a54abf60ac9a5e",
+    "configs/empirical_v4.yaml": "42348b9b75c23c1249a757e89073cb24c6e3194563f91451b0e547b429c65b7d",
+    "src/market_information_dynamics/evaluation/candidate_overlay.py": "d2cf2648d55037f0cd3d02904ee6932a8c37511007e70227b1ee6ecfbc3d5e15",
+    "src/market_information_dynamics/evaluation/empirical_v4.py": "f64d45a85d18b3ca0a20bab931aa644c3871a3f4547a8e2a6069f2f6c95737bb",
+    "src/market_information_dynamics/online/fixed_share.py": "f6a6bdbb92bb1351b181f7e041b32598fa93826159be92fcdfe167a7b9ca8b72",
+    "docs/prospective_protocol.md": "0f5cfc39308579f506f3d307e88a8e917ea1fec1a0fd0c07f071260311054c08"
+  }
+}

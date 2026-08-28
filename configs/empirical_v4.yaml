@@ -1,0 +1,36 @@
+# Online model-selection experiment.
+# v3's hand-built gate protected the financial core but still activated some overlays
+# that later underperformed. v4 replaces the gate with a standard sequential-decision
+# algorithm: Fixed-Share exponential weights across forecast experts.
+horizons: [1, 5, 10, 20]
+
+online_aggregation:
+  # Primary experts. The candidate model has already passed edge-level survival filtering.
+  experts:
+    - financial_direct_sparse
+    - candidate_overlay_survival
+
+  # Fixed-Share probability mass injected per realised update. 1/252 corresponds to a
+  # one-trading-year switching timescale; diagnostics report nearby values without using
+  # them to select the primary result.
+  share: 0.003968253968253968
+  share_sensitivity: [0.0, 0.001984126984126984, 0.003968253968253968, 0.007936507936507936]
+
+  # Squared losses are divided by a trailing median of previously realised pooled expert
+  # losses, then clipped into [0, 1] before Hedge updates.
+  loss_scale_window: 252
+  loss_clip: 5.0
+
+evaluation:
+  development_end: 2024-12-31
+  reused_evaluation_start: 2025-01-01
+  prospective_start: 2026-09-01
+
+forecast_test:
+  base_hac_lags: 5
+  fdr_q: 0.10
+  comparisons:
+    - [ar, financial_direct_sparse]
+    - [financial_direct_sparse, candidate_overlay_survival]
+    - [financial_direct_sparse, online_fixed_share]
+    - [candidate_overlay_survival, online_fixed_share]

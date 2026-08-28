@@ -1,3 +1,12 @@
+## 0.7.0 — online expert aggregation and prospective freeze
+
+- Freezes the empirical-v3 diagnostic result: the protected-core gate reduced candidate-model damage but did not robustly beat the financial core.
+- Adds causal Fixed-Share exponential weighting between the financial core and survival-filtered candidate overlay.
+- Delays h-step loss updates until the complete horizon has realised.
+- Adds bounded loss normalisation, self-confident Hedge learning rates and share-parameter diagnostics.
+- Adds empirical-v4 outputs, expert-weight lifecycle plots and a controlled regime-switch demonstration.
+- Freezes the September-2026+ prospective protocol; further statistical changes require a new exploratory version.
+
 ## 0.6.0 — protected-core candidate overlay
 
 - Freezes the real empirical-v2 evidence pack and records its partial/null result.

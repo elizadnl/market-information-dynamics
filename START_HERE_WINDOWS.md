@@ -1,4 +1,4 @@
-# Windows quick start — v0.6
+# Windows quick start — v0.7
 
 Run these commands from the repository root.
 
@@ -7,27 +7,30 @@ python -m pip install -e ".[dev]"
 python -m pytest -q
 ```
 
-If `data/processed/public_pilot.csv` already exists from v1/v2, do **not** redownload PortWatch.
-Run the new candidate-overlay experiment directly:
+If `artifacts/empirical_v3/` already exists, v4 needs **no data download and no model refit**.
+It only performs causal online aggregation of the frozen v3 forecast experts:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\run_candidate_overlay.ps1
+powershell -ExecutionPolicy Bypass -File scripts\run_online_aggregation.ps1
 ```
 
-The result will be written to:
+Outputs:
 
 ```text
-artifacts\empirical_v3\
+artifacts\empirical_v4\
 ```
 
-To zip the evidence pack into Downloads:
+Zip them to Downloads with:
 
 ```powershell
-Compress-Archive -Path artifacts\empirical_v3\* -DestinationPath "$HOME\Downloads\empirical_v3_results.zip" -Force
+Compress-Archive -Path artifacts\empirical_v4\* -DestinationPath "$HOME\Downloads\empirical_v4_results.zip" -Force
 ```
 
-Controlled synthetic demonstration:
+Controlled regime-switch demonstration:
 
 ```powershell
-python -m market_information_dynamics.cli overlay-demo --out artifacts
+python -m market_information_dynamics.cli online-demo --out artifacts
 ```
+
+The statistical protocol for September-2026 onward is frozen in
+`docs/prospective_protocol.md`.
