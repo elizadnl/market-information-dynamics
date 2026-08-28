@@ -17,11 +17,18 @@ from market_information_dynamics.data.portwatch import (
     portwatch_features_to_releases,
 )
 from market_information_dynamics.demo import run_demo
+from market_information_dynamics.demo_survival import run_survival_demo
 from market_information_dynamics.evaluation.empirical import run_empirical_v1
+from market_information_dynamics.evaluation.empirical_v2 import run_empirical_v2
 from market_information_dynamics.reporting import write_empirical_markdown
+from market_information_dynamics.reporting_v2 import write_empirical_v2_markdown
 from market_information_dynamics.visualization.empirical import (
     plot_oos_skill,
     plot_physical_incremental_skill,
+)
+from market_information_dynamics.visualization.survival import (
+    plot_horizon_skill,
+    plot_survival_lifecycle,
 )
 
 
@@ -120,6 +127,62 @@ def _run_empirical_from_panel(
     print(f"Wrote empirical v1 outputs to {out}")
 
 
+def _run_empirical_v2_from_panel(
+    panel: pd.DataFrame,
+    *,
+    financial_config: str,
+    experiment_config: str,
+    out_dir: str,
+) -> None:
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    financial_columns = _financial_ids(financial_config)
+    result = run_empirical_v2(
+        panel, financial_columns=financial_columns, config_path=experiment_config
+    )
+    result.metrics.to_csv(out / "metrics.csv", index=False)
+    result.forecast_tests.to_csv(out / "nested_forecast_tests.csv", index=False)
+    result.latest_survival.to_csv(out / "latest_edge_survival.csv", index=False)
+
+    for horizon, h_result in result.horizon_results.items():
+        h_dir = out / f"h{horizon}"
+        h_dir.mkdir(parents=True, exist_ok=True)
+        h_result.actuals.to_csv(h_dir / "actuals.csv")
+        for model_name, frame in h_result.predictions.items():
+            frame.to_csv(h_dir / f"predictions_{model_name}.csv")
+        h_result.edge_snapshots.to_csv(h_dir / "edge_snapshots.csv", index=False)
+        h_result.edge_contributions.to_csv(h_dir / "edge_contributions.csv", index=False)
+        h_result.survival_history.to_csv(h_dir / "survival_history.csv", index=False)
+
+    for segment in ["oos_all", "development", "reused_holdout"]:
+        if (result.metrics["segment"] == segment).any():
+            plot_horizon_skill(result.metrics, out / f"horizon_skill_{segment}.png", segment=segment)
+
+    if not result.latest_survival.empty:
+        config = yaml.safe_load(Path(experiment_config).read_text())
+        n_edges = int(config.get("report", {}).get("lifecycle_edges", 6))
+        top = result.latest_survival.sort_values("survival_score", ascending=False).head(n_edges)
+        for row in top.itertuples(index=False):
+            history = result.horizon_results[int(row.horizon)].survival_history
+            safe_source = str(row.source).replace("/", "_")
+            safe_target = str(row.target).replace("/", "_")
+            plot_survival_lifecycle(
+                history,
+                source=row.source,
+                target=row.target,
+                horizon=int(row.horizon),
+                output=out / f"lifecycle_h{int(row.horizon)}_{safe_source}__{safe_target}.png",
+            )
+
+    write_empirical_v2_markdown(
+        result.metrics,
+        result.forecast_tests,
+        result.latest_survival,
+        output=out / "RESULTS.md",
+    )
+    print(f"Wrote empirical v2 signal-survival outputs to {out}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="market-information-dynamics")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -127,6 +190,11 @@ def main() -> None:
     demo = sub.add_parser("demo", help="Run the leakage-safe synthetic walk-forward demo")
     demo.add_argument("--out", default="artifacts")
     demo.add_argument("--n-obs", type=int, default=1800)
+
+    survival_demo = sub.add_parser(
+        "survival-demo", help="Run the controlled predictive-edge death demonstration"
+    )
+    survival_demo.add_argument("--out", default="artifacts")
 
     fred = sub.add_parser("fred-pilot", help="Download the configured public FRED pilot panel")
     fred.add_argument("--config", default="configs/universe_v0.yaml")
@@ -157,6 +225,15 @@ def main() -> None:
     empirical.add_argument("--experiment-config", default="configs/empirical_v1.yaml")
     empirical.add_argument("--out", default="artifacts/empirical_v1")
 
+    empirical_v2 = sub.add_parser(
+        "empirical-v2",
+        help="Run multi-horizon predictive-edge survival research on an existing public panel",
+    )
+    empirical_v2.add_argument("--panel", default="data/processed/public_pilot.csv")
+    empirical_v2.add_argument("--financial-config", default="configs/universe_v1.yaml")
+    empirical_v2.add_argument("--experiment-config", default="configs/empirical_v2.yaml")
+    empirical_v2.add_argument("--out", default="artifacts/empirical_v2")
+
     research = sub.add_parser(
         "public-research", help="Download public data and run primary + lag-sensitivity research"
     )
@@ -175,6 +252,11 @@ def main() -> None:
     if args.command == "demo":
         paths = run_demo(out_dir=args.out, n_obs=args.n_obs)
         print("Demo complete:")
+        for key, value in paths.items():
+            print(f"  {key}: {value}")
+    elif args.command == "survival-demo":
+        paths = run_survival_demo(out_dir=args.out)
+        print("Signal-survival demo complete:")
         for key, value in paths.items():
             print(f"  {key}: {value}")
     elif args.command == "fred-pilot":
@@ -284,6 +366,14 @@ def main() -> None:
     elif args.command == "empirical-v1":
         panel = pd.read_csv(args.panel, index_col=0, parse_dates=True)
         _run_empirical_from_panel(
+            panel,
+            financial_config=args.financial_config,
+            experiment_config=args.experiment_config,
+            out_dir=args.out,
+        )
+    elif args.command == "empirical-v2":
+        panel = pd.read_csv(args.panel, index_col=0, parse_dates=True)
+        _run_empirical_v2_from_panel(
             panel,
             financial_config=args.financial_config,
             experiment_config=args.experiment_config,

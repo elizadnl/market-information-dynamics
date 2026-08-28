@@ -2,63 +2,85 @@
 
 ## Core question
 
-Can we estimate where predictive information first appears, how it propagates across a
-mixed physical-financial system, and when previously useful relationships stop working?
+Can we estimate where predictive information appears, whether it remains useful out of sample,
+and when previously useful relationships stop working?
 
-The project deliberately studies **predictive information**, not structural causality.
-A directed edge means that lagged observations of one variable improve forecasts of
-another under the stated model and validation protocol.
+The project studies **predictive information**, not structural causality. A directed edge means
+that lagged observations of one variable contribute to an explicit forecast under the stated
+model and validation protocol.
 
-## Pre-registered hypotheses for the first empirical release
+## Empirical v1: physical-data ablation
 
-**H1 — Incremental information exists.** Some directed lag relationships survive after
-controlling for each target's own history and common features.
+The first real-data release pre-specified a one-day comparison between target-only AR,
+financial-only sparse VAR, financial + physical sparse VAR, and a cumulative historical
+edge-stability filter. It also fixed a 2025+ reporting segment and PortWatch availability-lag
+sensitivity before the first real run.
 
-**H2 — Edge stability matters.** Forecasts conditioned on historically stable edges
-outperform forecasts that use every in-sample relationship.
+The physical-data hypothesis produced a null result: the baseline PortWatch layer did not
+robustly improve the financial-only model, and no physical-data improvement survived FDR.
+This result remains frozen under `artifacts/empirical_v1_public/`.
 
-**H3 — The graph is non-stationary.** A time-varying model materially outperforms one
-static graph over the full sample on genuine forward data.
+## Empirical v2: predictive edge survival
 
-**H4 — Physical data can add information.** A model with public physical-economy features
-improves at least one pre-specified financial target relative to a financial-only baseline.
+v1 exposed a more general failure: repeated coefficient selection and sign stability did not
+necessarily imply useful subsequent forecasts. v2 therefore pre-specifies the following
+questions.
 
-Failure to reject any hypothesis is an acceptable research outcome.
+**H1 — Multivariate information exists at some horizon.** A financial-only direct sparse model
+can improve on a target-only direct AR for at least some pre-specified target/horizon pairs.
 
-## Evaluation hierarchy
+**H2 — Physical information is horizon-dependent.** If public physical-economy data adds
+incremental information, the effect may appear at 5/10/20-day horizons rather than only at one
+day. This is tested as a family, not selected after the fact.
 
-1. Naive persistence / historical-mean baseline.
-2. Target-only autoregression.
-3. Dense multivariate baseline where feasible.
-4. Sparse VAR.
-5. Sparse VAR + edge-stability filter.
-6. Time-varying / change-point extension.
+**H3 — Realised predictive contribution matters.** A survivor model that requires positive
+past OOS marginal loss contribution improves on the unfiltered full sparse model more reliably
+than coefficient persistence alone.
 
-Every comparison is walk-forward. Scaling, feature selection, regularisation tuning and
-network estimation must be fitted using training data only.
+**H4 — Signals decay.** Recency-weighted edge state should distinguish relationships whose
+recent predictive contribution is deteriorating from relationships kept alive by old history.
 
-## Multiple testing
+Failure to support any hypothesis remains an acceptable outcome.
 
-The network creates many candidate edges. Exploratory p-values are not reported as
-"discoveries" without false-discovery-rate control and stability checks. Bootstrap or
-block-permutation procedures will be used when serial dependence invalidates iid tests.
+## v2 evaluation hierarchy
+
+1. target-only direct AR;
+2. financial-only direct sparse model;
+3. full financial + physical direct sparse model;
+4. predictive-edge-survival filter;
+5. post-selection Ridge refit on surviving sources.
+
+Horizons are fixed at 1, 5, 10 and 20 trading days. All forecasts are direct cumulative-target
+forecasts, not recursive rollouts.
+
+## Online attribution rule
+
+For each selected cross-series edge, the engine computes a counterfactual forecast with that
+edge removed. The edge's marginal squared-loss improvement cannot enter its survival state until
+the entire forecast horizon is observed. This prevents the survival filter from using future
+outcomes.
+
+## Multiple testing and overlapping horizons
+
+The project tests three nested comparison families across targets and horizons. Loss-difference
+inference uses HAC variance with lag length at least `h-1` for overlapping h-day outcomes.
+Benjamini-Hochberg FDR is applied within each pre-specified comparison family.
+
+## Holdout-status rule
+
+The 2025+ window was inspected in empirical v1. It is therefore a **reused holdout** in v2, not
+a pristine confirmatory sample. v2 development is anchored in pre-2025 walk-forward evidence,
+while observations from September 2026 onward are reserved for prospective validation.
 
 ## Point-in-time rule
 
-A datum can enter the feature panel only at the timestamp it was actually observable.
-Macro vintages/revisions and delayed physical-data releases are represented using
-`available_at`, not merely the economic observation date.
-
-## Initial universe philosophy
-
-Start with 20–40 interpretable variables, not hundreds of opaque tickers. Each node must
-have a reason to exist and a documented observation frequency, timezone, publication lag,
-transformation and source.
+A datum can enter the feature panel only at the timestamp it could reasonably have been
+available. Macro revisions and delayed physical observations must be represented with explicit
+availability timing rather than economic observation date alone.
 
 ## What this project is not
 
 - It is not a claim that Granger-style predictability proves causality.
 - It is not a competition to maximise backtest Sharpe.
 - It does not use employer data, code, models or proprietary research.
-- It does not add deep learning unless a simpler model demonstrably leaves exploitable
-  nonlinear structure on the table.
+- It does not add a more complex model merely because it sounds more sophisticated.

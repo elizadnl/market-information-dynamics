@@ -1,0 +1,57 @@
+# Predictive-edge-survival experiment.
+# v1 showed that persistent LASSO selection alone did not imply OOS usefulness.
+# v2 therefore requires realised forecast-loss contribution before a cross-series edge survives.
+targets:
+  - audusd
+  - brlusd
+  - cnyusd
+  - krwusd
+  - eurusd
+  - sp500
+  - vix
+  - us2y
+  - us10y
+  - wti
+  - brent
+  - henry_hub
+
+# Direct cumulative forecasts. h=5 predicts the sum of the next five transformed daily moves.
+horizons: [1, 5, 10, 20]
+
+model:
+  lags: 5
+  alpha: 0.035
+  ar_alpha: 1.0
+  post_selection_ridge_alpha: 1.0
+  min_train: 750
+  refit_every: 20
+
+survival:
+  edge_threshold: 0.05
+  # Old structural evidence and realised predictive value decay separately.
+  structural_half_life_days: 180
+  contribution_half_life_days: 120
+  min_selection_frequency: 0.55
+  min_sign_stability: 0.65
+  min_strength_retention: 0.50
+  min_contributions: 20
+  min_survival_snapshots: 6
+  max_edges_per_target: 8
+
+evaluation:
+  # v1 already inspected 2025+, so it is no longer described as pristine in v2.
+  development_end: 2024-12-31
+  reused_holdout_start: 2025-01-01
+  # Prospective observations after the current project build date are reserved for future checks.
+  prospective_start: 2026-09-01
+
+forecast_test:
+  base_hac_lags: 5
+  fdr_q: 0.10
+  comparisons:
+    - [ar, financial_direct_sparse]
+    - [financial_direct_sparse, full_direct_sparse]
+    - [full_direct_sparse, survival_refit_full]
+
+report:
+  lifecycle_edges: 6

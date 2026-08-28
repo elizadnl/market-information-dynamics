@@ -1,0 +1,10 @@
+{
+  "start": "2020-04-15",
+  "end": "2026-08-21",
+  "rows": 1459,
+  "columns": 24,
+  "complete_rows": 1459,
+  "duplicate_dates": 0,
+  "max_calendar_gap_days": 7,
+  "median_calendar_gap_days": 1.0
+}
