@@ -1,0 +1,43 @@
+# Pre-specified first real-data experiment.
+# No final-test decisions should be changed after inspecting the held-out results.
+targets:
+  - audusd
+  - brlusd
+  - cnyusd
+  - krwusd
+  - eurusd
+  - sp500
+  - vix
+  - us2y
+  - us10y
+  - wti
+  - brent
+  - henry_hub
+
+model:
+  # Daily lags. The physical series already enter only after their assumed publication lag.
+  lags: 5
+  alpha: 0.035
+  ar_alpha: 1.0
+  # ~3 trading years before the first forecast when starting in 2019.
+  min_train: 750
+  refit_every: 20
+
+stability:
+  edge_threshold: 0.05
+  min_selection_frequency: 0.60
+  min_sign_stability: 0.70
+  min_snapshots: 5
+
+evaluation:
+  # Locked before inspecting real results. Method changes should use pre-2025 evidence only;
+  # the 2025+ window is the final untouched reporting segment.
+  final_holdout_start: 2025-01-01
+
+forecast_test:
+  # Physical+financial vs financial-only is the primary incremental-information test.
+  hac_lags: 5
+  fdr_q: 0.10
+
+report:
+  top_edges: 30

@@ -1,0 +1,6 @@
+model,rmse
+candidate_overlay_adaptive,0.5834337503211348
+candidate_overlay_survival,0.591847212738292
+candidate_overlay_sparse,0.6320254749071066
+financial_direct_sparse,0.6673269667566816
+ar,0.8230049902901797

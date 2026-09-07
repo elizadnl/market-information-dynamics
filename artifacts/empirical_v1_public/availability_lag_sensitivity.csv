@@ -1,0 +1,4 @@
+availability_lag_days,mean_incremental_rmse_skill,median_incremental_rmse_skill,targets_improved,targets_total,fdr_significant_improvements
+7,-0.000985334641555119,-0.0010386016186959557,2,12,0
+14,-0.0008964837829088615,-0.00046395549401145875,5,12,0
+21,-0.00014228124190975486,7.586606285980846e-05,6,12,0

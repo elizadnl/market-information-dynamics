@@ -1,0 +1,28 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+.env
+.DS_Store
+build/
+artifacts/*.parquet
+artifacts/*.pkl
+data/raw/
+data/interim/
+data/processed/
+
+# Resumable public-data download cache
+data/cache/
+
+# Local packaging / editable-install metadata
+*.egg-info/
+
+# Full generated empirical runs are reproducible locally; keep only curated *_public evidence in Git
+artifacts/empirical_v1/
+artifacts/empirical_v2/
+artifacts/empirical_v3/
+artifacts/empirical_v4/
+
+# Local result archives
+empirical_v*_results.zip

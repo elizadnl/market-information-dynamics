@@ -1,0 +1,6 @@
+source,target,strength,sign
+commodity,fx,0.35754632965295696,1.0
+fx,equity,0.31879635918728055,1.0
+physical,commodity,0.2841685846872379,1.0
+equity,vol,0.23280063238432938,-1.0
+commodity,rates,0.14199839358183708,1.0
